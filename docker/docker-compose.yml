@@ -2,7 +2,11 @@ version: '3.1'
 
 services:
     flowise:
-        image: flowiseai/flowise
+        # Removed image line to build locally
+        # image: flowiseai/flowise
+        build:
+          context: ..
+          dockerfile: Dockerfile
         restart: always
         environment:
             - PORT=${PORT}
@@ -12,7 +16,7 @@ services:
             - FLOWISE_PASSWORD=${FLOWISE_PASSWORD}
             - FLOWISE_FILE_SIZE_LIMIT=${FLOWISE_FILE_SIZE_LIMIT}
             - DEBUG=${DEBUG}
-            - DATABASE_PATH=${DATABASE_PATH}
+            - DATABASE_PATH=${DATABASE_PATH} # Defaults to /root/.flowise if not set
             - DATABASE_TYPE=${DATABASE_TYPE}
             - DATABASE_PORT=${DATABASE_PORT}
             - DATABASE_HOST=${DATABASE_HOST}
@@ -22,12 +26,13 @@ services:
             - DATABASE_SSL=${DATABASE_SSL}
             - DATABASE_SSL_KEY_BASE64=${DATABASE_SSL_KEY_BASE64}
             - APIKEY_STORAGE_TYPE=${APIKEY_STORAGE_TYPE}
-            - APIKEY_PATH=${APIKEY_PATH}
-            - SECRETKEY_PATH=${SECRETKEY_PATH}
+            - APIKEY_PATH=${APIKEY_PATH} # Defaults to /root/.flowise if not set
+            - SECRETKEY_PATH=${SECRETKEY_PATH} # Defaults to /root/.flowise if not set
             - FLOWISE_SECRETKEY_OVERWRITE=${FLOWISE_SECRETKEY_OVERWRITE}
             - LOG_LEVEL=${LOG_LEVEL}
-            - LOG_PATH=${LOG_PATH}
-            - BLOB_STORAGE_PATH=${BLOB_STORAGE_PATH}
+            - LOG_PATH=${LOG_PATH} # Defaults to /root/.flowise/logs if not set
+            - BLOB_STORAGE_PATH=${BLOB_STORAGE_PATH} # Defaults to /root/.flowise/storage if not set
+            - FLOWISE_AUDIT_TRAIL_STORAGE_PATH=/data/flow-versions # Added: Path inside container for flow versions
             - DISABLE_FLOWISE_TELEMETRY=${DISABLE_FLOWISE_TELEMETRY}
             - MODEL_LIST_CONFIG_JSON=${MODEL_LIST_CONFIG_JSON}
             - GLOBAL_AGENT_HTTP_PROXY=${GLOBAL_AGENT_HTTP_PROXY}
@@ -58,5 +63,6 @@ services:
             retries: 5
             start_period: 30s
         volumes:
-            - ~/.flowise:/root/.flowise
-        entrypoint: /bin/sh -c "sleep 3; flowise start"
+            - ~/.flowise:/root/.flowise # Existing volume for database, logs, etc.
+            - ./flowise-data:/data     # Added: Maps host ./flowise-data to /data in container
+        entrypoint: /bin/sh -c "sleep 3; pnpm start"
