@@ -18,6 +18,9 @@ import { containsBase64File, updateFlowDataWithFilePaths } from '../../utils/fil
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 import { utilGetUploadsConfig } from '../../utils/getUploadsConfig'
 import logger from '../../utils/logger'
+import { validate } from 'uuid'
+import fs from 'fs';
+import path from 'path';
 import { updateStorageUsage } from '../../utils/quotaUsage'
 
 export const enum ChatflowErrorMessage {
@@ -28,6 +31,52 @@ export function validateChatflowType(type: ChatflowType | undefined) {
     if (!Object.values(EnumChatflowType).includes(type as EnumChatflowType))
         throw new InternalFlowiseError(StatusCodes.BAD_REQUEST, ChatflowErrorMessage.INVALID_CHATFLOW_TYPE)
 }
+
+
+// Helper function to save a version of the chatflow to the local filesystem
+const saveFlowVersion = async (chatflowData: ChatFlow): Promise<void> => {
+    try {
+        const flowId = chatflowData.id;
+        if (!flowId) {
+            logger.error('[Audit Trail] Cannot save version: Flow ID is missing.');
+            return;
+        }
+        if (!chatflowData.flowData) {
+            logger.error(`[Audit Trail] Cannot save version for flow ${flowId}: flowData is empty.`);
+            return;
+        }
+
+        const timestamp = new Date().toISOString().replace(/:/g, '-');
+        const storagePath = process.env.FLOWISE_AUDIT_TRAIL_STORAGE_PATH || path.join(process.cwd(), 'flowise-data');
+        const versionDir = path.join(storagePath, 'flow-versions', flowId);
+        const versionFilePath = path.join(versionDir, `${timestamp}.json`);
+
+        await fs.promises.mkdir(versionDir, { recursive: true });
+
+        // Parse the flowData string into an object
+        let parsedFlowData;
+        try {
+            parsedFlowData = JSON.parse(chatflowData.flowData);
+        } catch (parseError) {
+            logger.error(`[Audit Trail] Error parsing flowData for flow ${flowId}: ${getErrorMessage(parseError)}`);
+            // Optionally, save the raw string if parsing fails, or just return
+            // await fs.promises.writeFile(versionFilePath, chatflowData.flowData);
+            return; // Don't save if parsing failed
+        }
+
+        // Add the savedAt timestamp to the parsed data (optional, but good for audit)
+        // parsedFlowData._savedAt = new Date().toISOString(); 
+        // Let's omit this for now to strictly match the export format
+
+        // Write the parsed flow data object directly to the file
+        await fs.promises.writeFile(versionFilePath, JSON.stringify(parsedFlowData, null, 2));
+
+        logger.info(`[Audit Trail] Saved version for flow ${flowId} to ${versionFilePath}`);
+
+    } catch (error) {
+        logger.error(`[Audit Trail] Error saving flow version for ${chatflowData.id}: ${getErrorMessage(error)}`);
+    }
+};
 
 // Check if chatflow valid for streaming
 const checkIfChatflowIsValidForStreaming = async (chatflowId: string): Promise<any> => {
@@ -337,6 +386,7 @@ const updateChatflow = async (
     await _checkAndUpdateDocumentStoreUsage(newDbChatflow, chatflow.workspaceId)
     const dbResponse = await appServer.AppDataSource.getRepository(ChatFlow).save(newDbChatflow)
 
+    await saveFlowVersion(dbResponse);
     return dbResponse
 }
 

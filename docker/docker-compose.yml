@@ -2,13 +2,21 @@ version: '3.1'
 
 services:
     flowise:
-        image: flowiseai/flowise:latest
+        # Removed image line to build locally
+        # image: flowiseai/flowise
+        build:
+          context: ..
+          dockerfile: Dockerfile
         restart: always
         environment:
             - PORT=${PORT}
-
-            # DATABASE
-            - DATABASE_PATH=${DATABASE_PATH}
+            - CORS_ORIGINS=${CORS_ORIGINS}
+            - IFRAME_ORIGINS=${IFRAME_ORIGINS}
+            - FLOWISE_USERNAME=${FLOWISE_USERNAME}
+            - FLOWISE_PASSWORD=${FLOWISE_PASSWORD}
+            - FLOWISE_FILE_SIZE_LIMIT=${FLOWISE_FILE_SIZE_LIMIT}
+            - DEBUG=${DEBUG}
+            - DATABASE_PATH=${DATABASE_PATH} # Defaults to /root/.flowise if not set
             - DATABASE_TYPE=${DATABASE_TYPE}
             - DATABASE_PORT=${DATABASE_PORT}
             - DATABASE_HOST=${DATABASE_HOST}
@@ -21,6 +29,8 @@ services:
             # SECRET KEYS
             - SECRETKEY_STORAGE_TYPE=${SECRETKEY_STORAGE_TYPE}
             - SECRETKEY_PATH=${SECRETKEY_PATH}
+            - APIKEY_STORAGE_TYPE=${APIKEY_STORAGE_TYPE}
+            - APIKEY_PATH=${APIKEY_PATH}
             - FLOWISE_SECRETKEY_OVERWRITE=${FLOWISE_SECRETKEY_OVERWRITE}
             - SECRETKEY_AWS_ACCESS_KEY=${SECRETKEY_AWS_ACCESS_KEY}
             - SECRETKEY_AWS_SECRET_KEY=${SECRETKEY_AWS_SECRET_KEY}
@@ -35,6 +45,8 @@ services:
             # CUSTOM TOOL DEPENDENCIES
             - TOOL_FUNCTION_BUILTIN_DEP=${TOOL_FUNCTION_BUILTIN_DEP}
             - TOOL_FUNCTION_EXTERNAL_DEP=${TOOL_FUNCTION_EXTERNAL_DEP}
+
+            - FLOWISE_AUDIT_TRAIL_STORAGE_PATH=/data/flow-versions # Added: Path inside container for flow versions
 
             # STORAGE
             - STORAGE_TYPE=${STORAGE_TYPE}
@@ -132,5 +144,6 @@ services:
             retries: 5
             start_period: 30s
         volumes:
-            - ~/.flowise:/root/.flowise
-        entrypoint: /bin/sh -c "sleep 3; flowise start"
+            - ~/.flowise:/root/.flowise # Existing volume for database, logs, etc.
+            - ./flowise-data:/data     # Added: Maps host ./flowise-data to /data in container
+        entrypoint: /bin/sh -c "sleep 3; pnpm start"
