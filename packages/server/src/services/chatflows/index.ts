@@ -18,7 +18,7 @@ import { containsBase64File, updateFlowDataWithFilePaths } from '../../utils/fil
 import { getRunningExpressApp } from '../../utils/getRunningExpressApp'
 import { utilGetUploadsConfig } from '../../utils/getUploadsConfig'
 import logger from '../../utils/logger'
-<<<<<<< HEAD
+import { checkUsageLimit, updateStorageUsage } from '../../utils/quotaUsage'
 import { validate } from 'uuid'
 import fs from 'fs';
 import path from 'path';
@@ -67,9 +67,6 @@ const saveFlowVersion = async (chatflowData: ChatFlow): Promise<void> => {
         logger.error(`[Audit Trail] Error saving flow version for ${chatflowData.id}: ${getErrorMessage(error)}`);
     }
 };
-=======
-import { checkUsageLimit, updateStorageUsage } from '../../utils/quotaUsage'
->>>>>>> upstream/main
 
 // Check if chatflow valid for streaming
 const checkIfChatflowIsValidForStreaming = async (chatflowId: string): Promise<any> => {
