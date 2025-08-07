@@ -101,6 +101,7 @@ export const availableDependencies = [
     'linkifyjs',
     'lunary',
     'mammoth',
+    'minio',
     'moment',
     'mongodb',
     'mysql2',
