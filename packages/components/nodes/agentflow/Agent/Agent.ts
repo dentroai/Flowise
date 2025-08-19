@@ -376,35 +376,41 @@ class Agent_Agentflow implements INode {
      * Supports data URLs (data:image/...) and direct HTTP(S) image links.
      * Returns an array of OpenAI vision-compatible parts: { type: 'image_url', image_url: { url } }
      */
-    private extractImagePartsFromToolOutput(toolOutput: any): any[] {
+    private async extractImagePartsFromToolOutput(toolOutput: any): Promise<any[]> {
         const imageParts: any[] = []
         try {
-            const tryAddUrl = (url: string) => {
-                if (typeof url !== 'string') return
+            const tryAddDataUrl = (dataUrl: string) => {
+                imageParts.push({ type: 'image_url', image_url: { url: dataUrl } })
+            }
+            const tryAddHttpUrlOrFetch = async (url: string) => {
                 const trimmed = url.trim()
                 if (trimmed.startsWith('data:image/')) {
-                    imageParts.push({ type: 'image_url', image_url: { url: trimmed } })
+                    tryAddDataUrl(trimmed)
                     return
                 }
                 if (/^https?:\/\//i.test(trimmed) && /(\.png|\.jpg|\.jpeg|\.gif|\.webp)(\?.*)?$/i.test(trimmed)) {
-                    imageParts.push({ type: 'image_url', image_url: { url: trimmed } })
+                    const dataUrl = await this.fetchAsDataUrl(trimmed)
+                    if (dataUrl) tryAddDataUrl(dataUrl)
+                }
+            }
+
+            const processString = async (text: string) => {
+                // data URLs
+                const dataUrlRegex = /(data:image\/(?:png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+)/g
+                let match
+                while ((match = dataUrlRegex.exec(text)) !== null) {
+                    tryAddDataUrl(match[1])
+                }
+                // http(s) links
+                const urlRegex = /(https?:\/\/[\w.-]+(?:\/[\w\-.~:@%/?#\[\]!$&'()*+,;=]*)?)/g
+                while ((match = urlRegex.exec(text)) !== null) {
+                    await tryAddHttpUrlOrFetch(match[1])
                 }
             }
 
             if (typeof toolOutput === 'string') {
-                // Find data URLs
-                const dataUrlRegex = /(data:image\/(?:png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+)/g
-                let match
-                while ((match = dataUrlRegex.exec(toolOutput)) !== null) {
-                    tryAddUrl(match[1])
-                }
-                // Find direct links likely to be images
-                const urlRegex = /(https?:\/\/[\w.-]+(?:\/[\w\-.~:@%/?#\[\]!$&'()*+,;=]*)?)/g
-                while ((match = urlRegex.exec(toolOutput)) !== null) {
-                    tryAddUrl(match[1])
-                }
+                await processString(toolOutput)
             } else if (toolOutput && typeof toolOutput === 'object') {
-                // Common shapes: { images: [dataUrl|url,...] } or { image: dataUrl|url }
                 const candidates: any[] = []
                 if (Array.isArray(toolOutput)) candidates.push(...toolOutput)
                 if (toolOutput.images && Array.isArray(toolOutput.images)) candidates.push(...toolOutput.images)
@@ -412,14 +418,25 @@ class Agent_Agentflow implements INode {
                 if (toolOutput.url) candidates.push(toolOutput.url)
                 if (toolOutput.links && Array.isArray(toolOutput.links)) candidates.push(...toolOutput.links)
                 for (const c of candidates) {
-                    if (typeof c === 'string') tryAddUrl(c)
-                    if (c && typeof c === 'object' && typeof c.url === 'string') tryAddUrl(c.url)
+                    if (typeof c === 'string') await tryAddHttpUrlOrFetch(c)
+                    if (c && typeof c === 'object' && typeof c.url === 'string') await tryAddHttpUrlOrFetch(c.url)
                 }
             }
-        } catch (_) {
-            // ignore
-        }
+        } catch (_) {}
         return imageParts
+    }
+
+    private async fetchAsDataUrl(url: string): Promise<string | null> {
+        try {
+            const res = await fetch(url)
+            if (!res.ok) return null
+            const contentType = res.headers.get('content-type') || 'image/jpeg'
+            const arrayBuf = await res.arrayBuffer()
+            const base64 = Buffer.from(arrayBuf).toString('base64')
+            return `data:${contentType};base64,${base64}`
+        } catch (_) {
+            return null
+        }
     }
 
     //@ts-ignore
@@ -1764,17 +1781,7 @@ class Agent_Agentflow implements INode {
 
                     // If tool output contains images, inject them as a user message with image_url parts
                     try {
-                        const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
-                        if (imageParts.length > 0) {
-                            messages.push({ role: 'user', content: imageParts })
-                        }
-                    } catch (e) {
-                        // ignore image extraction errors
-                    }
-
-                    // If tool output contains images, inject them as a user message with image_url parts
-                    try {
-                        const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
+                        const imageParts: any[] = await this.extractImagePartsFromToolOutput(toolOutput)
                         if (imageParts.length > 0) {
                             messages.push({ role: 'user', content: imageParts })
                         }
@@ -2056,7 +2063,7 @@ class Agent_Agentflow implements INode {
 
                         // If tool output contains images, inject them as a user message with image_url parts
                         try {
-                            const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
+                            const imageParts: any[] = await this.extractImagePartsFromToolOutput(toolOutput)
                             if (imageParts.length > 0) {
                                 messages.push({ role: 'user', content: imageParts })
                             }
@@ -2402,3 +2409,4 @@ class Agent_Agentflow implements INode {
 }
 
 module.exports = { nodeClass: Agent_Agentflow }
+
