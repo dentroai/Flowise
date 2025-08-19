@@ -371,6 +371,57 @@ class Agent_Agentflow implements INode {
         ]
     }
 
+    /**
+     * Extract images from a tool output string or object.
+     * Supports data URLs (data:image/...) and direct HTTP(S) image links.
+     * Returns an array of OpenAI vision-compatible parts: { type: 'image_url', image_url: { url } }
+     */
+    private extractImagePartsFromToolOutput(toolOutput: any): any[] {
+        const imageParts: any[] = []
+        try {
+            const tryAddUrl = (url: string) => {
+                if (typeof url !== 'string') return
+                const trimmed = url.trim()
+                if (trimmed.startsWith('data:image/')) {
+                    imageParts.push({ type: 'image_url', image_url: { url: trimmed } })
+                    return
+                }
+                if (/^https?:\/\//i.test(trimmed) && /(\.png|\.jpg|\.jpeg|\.gif|\.webp)(\?.*)?$/i.test(trimmed)) {
+                    imageParts.push({ type: 'image_url', image_url: { url: trimmed } })
+                }
+            }
+
+            if (typeof toolOutput === 'string') {
+                // Find data URLs
+                const dataUrlRegex = /(data:image\/(?:png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+)/g
+                let match
+                while ((match = dataUrlRegex.exec(toolOutput)) !== null) {
+                    tryAddUrl(match[1])
+                }
+                // Find direct links likely to be images
+                const urlRegex = /(https?:\/\/[\w.-]+(?:\/[\w\-.~:@%/?#\[\]!$&'()*+,;=]*)?)/g
+                while ((match = urlRegex.exec(toolOutput)) !== null) {
+                    tryAddUrl(match[1])
+                }
+            } else if (toolOutput && typeof toolOutput === 'object') {
+                // Common shapes: { images: [dataUrl|url,...] } or { image: dataUrl|url }
+                const candidates: any[] = []
+                if (Array.isArray(toolOutput)) candidates.push(...toolOutput)
+                if (toolOutput.images && Array.isArray(toolOutput.images)) candidates.push(...toolOutput.images)
+                if (toolOutput.image) candidates.push(toolOutput.image)
+                if (toolOutput.url) candidates.push(toolOutput.url)
+                if (toolOutput.links && Array.isArray(toolOutput.links)) candidates.push(...toolOutput.links)
+                for (const c of candidates) {
+                    if (typeof c === 'string') tryAddUrl(c)
+                    if (c && typeof c === 'object' && typeof c.url === 'string') tryAddUrl(c.url)
+                }
+            }
+        } catch (_) {
+            // ignore
+        }
+        return imageParts
+    }
+
     //@ts-ignore
     loadMethods = {
         async listModels(_: INodeData, options: ICommonObject): Promise<INodeOptionsValue[]> {
@@ -1711,6 +1762,26 @@ class Agent_Agentflow implements INode {
                         }
                     })
 
+                    // If tool output contains images, inject them as a user message with image_url parts
+                    try {
+                        const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
+                        if (imageParts.length > 0) {
+                            messages.push({ role: 'user', content: imageParts })
+                        }
+                    } catch (e) {
+                        // ignore image extraction errors
+                    }
+
+                    // If tool output contains images, inject them as a user message with image_url parts
+                    try {
+                        const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
+                        if (imageParts.length > 0) {
+                            messages.push({ role: 'user', content: imageParts })
+                        }
+                    } catch (e) {
+                        // ignore image extraction errors
+                    }
+
                     // Track used tools
                     usedTools.push({
                         tool: toolCall.name,
@@ -1982,6 +2053,16 @@ class Agent_Agentflow implements INode {
                                 sourceDocuments: parsedDocs
                             }
                         })
+
+                        // If tool output contains images, inject them as a user message with image_url parts
+                        try {
+                            const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
+                            if (imageParts.length > 0) {
+                                messages.push({ role: 'user', content: imageParts })
+                            }
+                        } catch (e) {
+                            // ignore image extraction errors
+                        }
 
                         // Track used tools
                         usedTools.push({
