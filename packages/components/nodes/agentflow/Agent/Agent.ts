@@ -376,25 +376,25 @@ class Agent_Agentflow implements INode {
      * Supports data URLs (data:image/...) and direct HTTP(S) image links.
      * Returns an array of OpenAI vision-compatible parts: { type: 'image_url', image_url: { url } }
      */
-    private async extractImagePartsFromToolOutput(toolOutput: any): Promise<any[]> {
+    private extractImagePartsFromToolOutput(toolOutput: any): any[] {
         const imageParts: any[] = []
         try {
             const tryAddDataUrl = (dataUrl: string) => {
                 imageParts.push({ type: 'image_url', image_url: { url: dataUrl } })
             }
-            const tryAddHttpUrlOrFetch = async (url: string) => {
+            const tryAddHttpUrlOrFetch = (url: string) => {
                 const trimmed = url.trim()
                 if (trimmed.startsWith('data:image/')) {
                     tryAddDataUrl(trimmed)
                     return
                 }
                 if (/^https?:\/\//i.test(trimmed) && /(\.png|\.jpg|\.jpeg|\.gif|\.webp)(\?.*)?$/i.test(trimmed)) {
-                    const dataUrl = await this.fetchAsDataUrl(trimmed)
-                    if (dataUrl) tryAddDataUrl(dataUrl)
+                    // Do not fetch server-side to avoid long payloads; pass URL directly
+                    imageParts.push({ type: 'image_url', image_url: { url: trimmed } })
                 }
             }
 
-            const processString = async (text: string) => {
+            const processString = (text: string) => {
                 // data URLs
                 const dataUrlRegex = /(data:image\/(?:png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+)/g
                 let match
@@ -404,12 +404,12 @@ class Agent_Agentflow implements INode {
                 // http(s) links
                 const urlRegex = /(https?:\/\/[\w.-]+(?:\/[\w\-.~:@%/?#\[\]!$&'()*+,;=]*)?)/g
                 while ((match = urlRegex.exec(text)) !== null) {
-                    await tryAddHttpUrlOrFetch(match[1])
+                    tryAddHttpUrlOrFetch(match[1])
                 }
             }
 
             if (typeof toolOutput === 'string') {
-                await processString(toolOutput)
+                processString(toolOutput)
             } else if (toolOutput && typeof toolOutput === 'object') {
                 const candidates: any[] = []
                 if (Array.isArray(toolOutput)) candidates.push(...toolOutput)
@@ -418,25 +418,12 @@ class Agent_Agentflow implements INode {
                 if (toolOutput.url) candidates.push(toolOutput.url)
                 if (toolOutput.links && Array.isArray(toolOutput.links)) candidates.push(...toolOutput.links)
                 for (const c of candidates) {
-                    if (typeof c === 'string') await tryAddHttpUrlOrFetch(c)
-                    if (c && typeof c === 'object' && typeof c.url === 'string') await tryAddHttpUrlOrFetch(c.url)
+                    if (typeof c === 'string') tryAddHttpUrlOrFetch(c)
+                    if (c && typeof c === 'object' && typeof c.url === 'string') tryAddHttpUrlOrFetch(c.url)
                 }
             }
         } catch (_) {}
         return imageParts
-    }
-
-    private async fetchAsDataUrl(url: string): Promise<string | null> {
-        try {
-            const res = await fetch(url)
-            if (!res.ok) return null
-            const contentType = res.headers.get('content-type') || 'image/jpeg'
-            const arrayBuf = await res.arrayBuffer()
-            const base64 = Buffer.from(arrayBuf).toString('base64')
-            return `data:${contentType};base64,${base64}`
-        } catch (_) {
-            return null
-        }
     }
 
     //@ts-ignore
@@ -1781,7 +1768,7 @@ class Agent_Agentflow implements INode {
 
                     // If tool output contains images, inject them as a user message with image_url parts
                     try {
-                        const imageParts: any[] = await this.extractImagePartsFromToolOutput(toolOutput)
+                        const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
                         if (imageParts.length > 0) {
                             messages.push({ role: 'user', content: imageParts })
                         }
@@ -2063,7 +2050,7 @@ class Agent_Agentflow implements INode {
 
                         // If tool output contains images, inject them as a user message with image_url parts
                         try {
-                            const imageParts: any[] = await this.extractImagePartsFromToolOutput(toolOutput)
+                            const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
                             if (imageParts.length > 0) {
                                 messages.push({ role: 'user', content: imageParts })
                             }
