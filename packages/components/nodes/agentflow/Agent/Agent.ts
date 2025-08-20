@@ -550,6 +550,7 @@ class Agent_Agentflow implements INode {
     }
 
     async run(nodeData: INodeData, input: string | Record<string, any>, options: ICommonObject): Promise<any> {
+        console.log('Agent run started with input:', input) 
         let llmIds: ICommonObject | undefined
         let analyticHandlers = options.analyticHandlers as AnalyticHandler
 
