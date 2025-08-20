@@ -375,7 +375,7 @@ class Tool_Agentflow implements INode {
                     imageParts.push({ type: 'image_url', image_url: { url: trimmed } })
                     return
                 }
-                if (/^https?:\/\//i.test(trimmed) && /(\.png|\.jpg|\.jpeg|\.gif|\.webp)(\?.*)?$/i.test(trimmed)) {
+                if (/^https?:\/\//i.test(trimmed) && /\.(png|jpg|jpeg|gif|webp)/i.test(trimmed)) {
                     imageParts.push({ type: 'image_url', image_url: { url: trimmed } })
                 }
             }
