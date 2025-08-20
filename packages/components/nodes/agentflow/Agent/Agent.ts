@@ -1769,13 +1769,24 @@ class Agent_Agentflow implements INode {
 
                     // If tool output contains images, inject them as a user message with image_url parts
                     try {
-                        const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
+                        let imageParts: any[] = []
+                        
+                        // Check if toolOutput is an object with imageParts (from Tool node)
+                        if (toolOutput && typeof toolOutput === 'object' && toolOutput.imageParts) {
+                            imageParts = toolOutput.imageParts
+                            console.log('Using imageParts from tool object:', imageParts.length)
+                        } else {
+                            // Extract from string content (custom code tools)
+                            imageParts = this.extractImagePartsFromToolOutput(toolOutput)
+                            console.log('Extracted imageParts from tool output:', imageParts.length)
+                        }
+                        
                         if (imageParts.length > 0) {
-                            console.log('Messages before LLM invoke:', JSON.stringify(messages, null, 2))
+                            console.log('Injecting image message with parts:', JSON.stringify(imageParts, null, 2))
                             messages.push({ role: 'user', content: imageParts })
                         }
                     } catch (e) {
-                        // ignore image extraction errors
+                        console.error('Error processing images from tool:', e)
                     }
 
                     // Track used tools
@@ -2052,13 +2063,24 @@ class Agent_Agentflow implements INode {
 
                         // If tool output contains images, inject them as a user message with image_url parts
                         try {
-                            const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
+                            let imageParts: any[] = []
+                            
+                            // Check if toolOutput is an object with imageParts (from Tool node)
+                            if (toolOutput && typeof toolOutput === 'object' && toolOutput.imageParts) {
+                                imageParts = toolOutput.imageParts
+                                console.log('Using imageParts from tool object:', imageParts.length)
+                            } else {
+                                // Extract from string content (custom code tools)
+                                imageParts = this.extractImagePartsFromToolOutput(toolOutput)
+                                console.log('Extracted imageParts from tool output:', imageParts.length)
+                            }
+                            
                             if (imageParts.length > 0) {
-                                console.log('Injecting image message:', JSON.stringify(imageParts, null, 2))
+                                console.log('Injecting image message (resumed):', JSON.stringify(imageParts, null, 2))
                                 messages.push({ role: 'user', content: imageParts })
                             }
                         } catch (e) {
-                            // ignore image extraction errors
+                            console.error('Error processing images from tool (resumed):', e)
                         }
 
                         // Track used tools

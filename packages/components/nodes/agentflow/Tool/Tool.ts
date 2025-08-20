@@ -339,6 +339,12 @@ class Tool_Agentflow implements INode {
                 }
             }
 
+            console.log('Tool output processed:', toolOutput.substring(0, 200))
+
+            // Extract images from tool output for vision injection
+            const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
+            console.log('Extracted image parts:', imageParts.length)
+
             const returnOutput = {
                 id: nodeData.id,
                 name: this.name,
@@ -348,7 +354,8 @@ class Tool_Agentflow implements INode {
                 },
                 output: {
                     content: toolOutput,
-                    artifacts: parsedArtifacts
+                    artifacts: parsedArtifacts,
+                    imageParts: imageParts.length > 0 ? imageParts : undefined
                 },
                 state: newState
             }
@@ -357,6 +364,48 @@ class Tool_Agentflow implements INode {
         } catch (e) {
             throw new Error(e)
         }
+    }
+
+    private extractImagePartsFromToolOutput(toolOutput: any): any[] {
+        const imageParts: any[] = []
+        try {
+            const tryAddHttpUrl = (url: string) => {
+                const trimmed = url.trim()
+                if (trimmed.startsWith('data:image/')) {
+                    imageParts.push({ type: 'image_url', image_url: { url: trimmed } })
+                    return
+                }
+                if (/^https?:\/\//i.test(trimmed) && /(\.png|\.jpg|\.jpeg|\.gif|\.webp)(\?.*)?$/i.test(trimmed)) {
+                    imageParts.push({ type: 'image_url', image_url: { url: trimmed } })
+                }
+            }
+
+            if (typeof toolOutput === 'string') {
+                // Find data URLs
+                const dataUrlRegex = /(data:image\/(?:png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+)/g
+                let match
+                while ((match = dataUrlRegex.exec(toolOutput)) !== null) {
+                    tryAddHttpUrl(match[1])
+                }
+                // Find http(s) links
+                const urlRegex = /(https?:\/\/[\w.-]+(?:\/[\w\-.~:@%/?#\[\]!$&'()*+,;=]*)?)/g
+                while ((match = urlRegex.exec(toolOutput)) !== null) {
+                    tryAddHttpUrl(match[1])
+                }
+            } else if (toolOutput && typeof toolOutput === 'object') {
+                const candidates: any[] = []
+                if (Array.isArray(toolOutput)) candidates.push(...toolOutput)
+                if (toolOutput.images && Array.isArray(toolOutput.images)) candidates.push(...toolOutput.images)
+                if (toolOutput.image) candidates.push(toolOutput.image)
+                if (toolOutput.url) candidates.push(toolOutput.url)
+                if (toolOutput.links && Array.isArray(toolOutput.links)) candidates.push(...toolOutput.links)
+                for (const c of candidates) {
+                    if (typeof c === 'string') tryAddHttpUrl(c)
+                    if (c && typeof c === 'object' && typeof c.url === 'string') tryAddHttpUrl(c.url)
+                }
+            }
+        } catch (_) {}
+        return imageParts
     }
 }
 
