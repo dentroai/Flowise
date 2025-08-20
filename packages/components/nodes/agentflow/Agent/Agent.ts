@@ -1770,6 +1770,7 @@ class Agent_Agentflow implements INode {
                     try {
                         const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
                         if (imageParts.length > 0) {
+                            console.log('Messages before LLM invoke:', JSON.stringify(messages, null, 2))
                             messages.push({ role: 'user', content: imageParts })
                         }
                     } catch (e) {
@@ -2052,6 +2053,7 @@ class Agent_Agentflow implements INode {
                         try {
                             const imageParts: any[] = this.extractImagePartsFromToolOutput(toolOutput)
                             if (imageParts.length > 0) {
+                                console.log('Injecting image message:', JSON.stringify(imageParts, null, 2))
                                 messages.push({ role: 'user', content: imageParts })
                             }
                         } catch (e) {
