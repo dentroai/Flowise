@@ -411,6 +411,14 @@ class Agent_Agentflow implements INode {
             if (typeof toolOutput === 'string') {
                 processString(toolOutput)
             } else if (toolOutput && typeof toolOutput === 'object') {
+                // Handle common shapes where content is embedded in an object
+                try {
+                    if (typeof (toolOutput as any).content === 'string') {
+                        processString((toolOutput as any).content)
+                    } else if ((toolOutput as any).output && typeof (toolOutput as any).output.content === 'string') {
+                        processString((toolOutput as any).output.content)
+                    }
+                } catch (_) {}
                 const candidates: any[] = []
                 if (Array.isArray(toolOutput)) candidates.push(...toolOutput)
                 if (toolOutput.images && Array.isArray(toolOutput.images)) candidates.push(...toolOutput.images)
