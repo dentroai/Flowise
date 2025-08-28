@@ -401,9 +401,15 @@ class Agent_Agentflow implements INode {
                 while ((match = dataUrlRegex.exec(text)) !== null) {
                     tryAddDataUrl(match[1])
                 }
-                // http(s) links
-                const urlRegex = /(https?:\/\/[\w.-]+(?:\/[\w\-.~:@%/?#\[\]!$&'()*+,;=]*)?)/g
+                // http(s) links - more flexible regex to handle MinIO URLs with query params
+                // Look for URLs that contain image file extensions followed by optional query params
+                const urlRegex = /(https?:\/\/[^\s\n]+?\.(?:png|jpg|jpeg|gif|webp)(?:\?[^\s\n]*)?)/gi
                 while ((match = urlRegex.exec(text)) !== null) {
+                    tryAddHttpUrlOrFetch(match[1])
+                }
+                // Also look for URLs that might be split across lines or have different formatting
+                const minioUrlRegex = /(https?:\/\/[^\s\n]+?\.(?:png|jpg|jpeg|gif|webp)[^\s\n]*)/gi
+                while ((match = minioUrlRegex.exec(text)) !== null) {
                     tryAddHttpUrlOrFetch(match[1])
                 }
             }
