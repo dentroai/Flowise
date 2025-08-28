@@ -389,7 +389,7 @@ class Agent_Agentflow implements INode {
                     return
                 }
                 if (/^https?:\/\//i.test(trimmed) && /\.(png|jpg|jpeg|gif|webp)/i.test(trimmed)) {
-                    // Do not fetch server-side to avoid long payloads; pass URL directly
+                    // Do not fetch server-side to avoid long payloads; pass URL directly 
                     imageParts.push({ type: 'image_url', image_url: { url: trimmed } })
                 }
             }
